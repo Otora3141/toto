@@ -338,6 +338,7 @@ body {
 .btn-num   { font-size: 1.1rem; font-weight: 700; }
 .btn-label { font-size: 0.7rem; color: var(--text-light); margin-top: 2px; }
 .btn-prob  { font-size: 0.72rem; margin-top: 3px; font-weight: 600; }
+.btn-team  { font-size: 0.68rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pred-btn.selected.btn-1 { border-color: var(--blue);   background: #ddeeff; }
 .pred-btn.selected.btn-0 { border-color: var(--purple); background: #eeddf5; }
@@ -656,3 +657,21 @@ body {
 .form-team { max-width: 6.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h2h-none { font-size: 0.78rem; color: var(--text-light); }
 .match-card .vs-sep { margin: 0 6px; }
+
+/* 買い目のページ送り */
+.ticket-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 8px 0; }
+.page-btn {
+  min-width: 2.2em;
+  padding: 4px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.page-btn:hover:not(:disabled) { background: var(--green-light); border-color: var(--green-mid); }
+.page-btn.current { background: var(--green-mid); border-color: var(--green-mid); color: #fff; font-weight: 700; }
+.page-btn:disabled { opacity: 0.4; cursor: default; }
+.page-gap { padding: 0 2px; color: var(--text-light); }
+.page-info { margin-left: 8px; font-size: 0.8rem; color: var(--text-light); }
+.combo-summary.warn { color: var(--red); font-weight: 600; }

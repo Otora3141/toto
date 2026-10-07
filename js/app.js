@@ -267,10 +267,11 @@ function renderPredictCards() {
     const h2hRows = pr.h2hList.slice(0, 6).map(x =>
       `<li>${esc(x.date)}　${esc(x.home)} <strong>${x.hg}-${x.ag}</strong> ${esc(x.away)}</li>`).join("");
     const noData = !pr.games.home || !pr.games.away;
-    const btn = (o, idx, label) => `
+    const btn = (o, idx, label, team) => `
       <button class="pred-btn btn-${o} ${sel.includes(o) ? "selected" : ""}" onclick="onPickClick(${i},'${o}')">
         <span class="btn-num">${o}</span>
         <span class="btn-label">${label}</span>
+        <span class="btn-team">${team ? esc(team) : "&nbsp;"}</span>
         <span class="btn-prob">${pct(p[idx])}</span>
       </button>`;
     return `
@@ -284,7 +285,7 @@ function renderPredictCards() {
         ${sel.length > 1 ? `<span class="data-badge multi">マルチ ${sel.length}</span>` : ""}
         ${noData ? `<span class="data-badge nodata">過去データ不足</span>` : ""}
       </div>
-      ${buildProbBar(p, sel)}
+      ${buildProbBar(p, sel, m)}
       <div class="basis">
         <div><span class="basis-label">過去データ</span> ${probTriplet(pr.elo)} <span class="sub">（レート ${pr.ratings.home} vs ${pr.ratings.away}）</span></div>
         <div><span class="basis-label">直接対決</span> ${h2h.n ? `${esc(m.home)}から見て ${h2h.counts[0]}勝 ${h2h.counts[1]}分 ${h2h.counts[2]}敗` : `<span class="sub">対戦データなし</span>`}</div>
@@ -297,19 +298,19 @@ function renderPredictCards() {
           : `<div class="h2h-none">直接対決の履歴 -</div>`}
       </div>
       <div class="prediction-buttons">
-        ${btn("1", 0, "ホーム勝ち")}${btn("0", 1, "引き分け")}${btn("2", 2, "アウェイ勝ち")}
+        ${btn("1", 0, "ホーム勝ち", m.home)}${btn("0", 1, "引き分け")}${btn("2", 2, "アウェイ勝ち", m.away)}
       </div>
     </div>`;
   }).join("");
   updatePredictSummary();
 }
 
-function buildProbBar(p, sel) {
+function buildProbBar(p, sel, m) {
   const w = p.map(x => (x * 100).toFixed(1));
   return `<div class="prob-bar-wrap"><div class="prob-bar">
-    <div class="pb-home ${sel.includes("1") ? "pb-selected" : ""}" style="width:${w[0]}%" title="ホーム勝ち ${w[0]}%"></div>
+    <div class="pb-home ${sel.includes("1") ? "pb-selected" : ""}" style="width:${w[0]}%" title="ホーム勝ち（${esc(m.home)}） ${w[0]}%"></div>
     <div class="pb-draw ${sel.includes("0") ? "pb-selected" : ""}" style="width:${w[1]}%" title="引き分け ${w[1]}%"></div>
-    <div class="pb-away ${sel.includes("2") ? "pb-selected" : ""}" style="width:${w[2]}%" title="アウェイ勝ち ${w[2]}%"></div>
+    <div class="pb-away ${sel.includes("2") ? "pb-selected" : ""}" style="width:${w[2]}%" title="アウェイ勝ち（${esc(m.away)}） ${w[2]}%"></div>
   </div></div>`;
 }
 
@@ -324,13 +325,20 @@ function onPickClick(i, o) {
 function updatePredictSummary() {
   const filled = AppState.picks.filter(s => s.length).length;
   const total = AppState.matches.length;
+  // 買い目の計算は印の組み合わせ全通りが対象なので、計算上限を超える予想はここで止める
+  const size = AppState.picks.reduce((a, s) => a * Math.max(s.length, 1), 1);
+  const tooMany = filled === total && size > MAX_UNIVERSE;
   const btn = $("btn-to-results");
-  btn.disabled = filled < total;
-  btn.textContent = filled < total ? `買い目を作る（残り ${total - filled} 試合）` : "買い目を作る →";
+  btn.disabled = filled < total || tooMany;
+  btn.textContent = filled < total ? `買い目を作る（残り ${total - filled} 試合）`
+    : tooMany ? "組み合わせが多すぎます" : "買い目を作る →";
   const el = $("combo-summary");
+  el.classList.toggle("warn", tooMany);
   el.innerHTML = filled < total
     ? `全試合で1つ以上の印を選んでください（${filled}/${total}）。迷う試合は複数選択（マルチ）できます。`
-    : "";
+    : tooMany
+      ? `⚠ 選んだ印の組み合わせが ${size.toLocaleString()} 通りあり、計算上限（${MAX_UNIVERSE.toLocaleString()} 通り）を超えています。マルチを減らしてください。`
+      : `選んだ印の組み合わせ: ${size.toLocaleString()} 通り`;
 }
 
 // ===== 結果ビュー =====
@@ -397,6 +405,7 @@ function runCover() {
     if (job !== coverJob) return;
     $("cover-status").style.display = "none";
     AppState.cover = data;
+    AppState.ticketPage = 0;
     renderCover();
   };
   try {
@@ -427,7 +436,7 @@ function computeCoverInline({ allowed, probs, filters, radius, timeBudgetMs }) {
   }
 }
 
-const MAX_TICKETS_SHOWN = 300;
+const TICKETS_PER_PAGE = 100;
 
 function renderCover() {
   const c = AppState.cover;
@@ -450,9 +459,13 @@ function renderCover() {
     ? `選んだ印の組み合わせを全通り購入します。結果がこの中に入れば1等です。`
     : `結果が選んだ印の範囲内（${c.universeSize.toLocaleString()} 通りのどれか）になれば、下の ${c.tickets.length.toLocaleString()} 枚のどれかが必ず ${n - (level - 1)} 試合以上的中します（${levelName}以上）。`;
 
-  const shown = c.tickets.slice(0, MAX_TICKETS_SHOWN);
+  const pages = Math.max(1, Math.ceil(c.tickets.length / TICKETS_PER_PAGE));
+  const page = Math.min(AppState.ticketPage || 0, pages - 1);
+  const start = page * TICKETS_PER_PAGE;
+  const shown = c.tickets.slice(start, start + TICKETS_PER_PAGE);
+  const pager = pages > 1 ? ticketPagerHtml(page, pages, start, shown.length, c.tickets.length) : "";
   const rows = shown.map((code, i) => `<div class="ticket-row">
-      <span class="ticket-label">${i + 1}枚目</span>
+      <span class="ticket-label">${(start + i + 1).toLocaleString()}枚目</span>
       <code class="ticket-code">${codeToMarks(code, n).split("").join("-")}</code></div>`).join("");
 
   el.innerHTML = `
@@ -462,8 +475,9 @@ function renderCover() {
     </div>
     <div class="tickets-section">
       <h4>購入リスト</h4>
+      ${pager}
       ${rows}
-      ${c.tickets.length > shown.length ? `<p class="sub">ほか ${(c.tickets.length - shown.length).toLocaleString()} 枚はコピー/CSV で取得してください。</p>` : ""}
+      ${pager}
       <div class="cost-info">合計 <strong>${(c.tickets.length * TICKET_PRICE).toLocaleString()}円</strong>
         （全通り ${(c.productSize * TICKET_PRICE).toLocaleString()}円 から ${pct(1 - c.tickets.length / c.productSize)} 削減）</div>
     </div>
@@ -471,6 +485,29 @@ function renderCover() {
       <button class="copy-btn" onclick="copyTickets()">📋 買い目をコピー</button>
       <button class="copy-btn" onclick="downloadTickets()">⬇ CSV で保存</button>
     </div>`;
+}
+
+function ticketPagerHtml(page, pages, start, count, total) {
+  const go = (p, label, disabled, cur) =>
+    `<button class="page-btn ${cur ? "current" : ""}" ${disabled ? "disabled" : ""} onclick="setTicketPage(${p})">${label}</button>`;
+  // 先頭・末尾と現在ページの前後2ページだけ番号を出し、間は … で省略する
+  const nums = [];
+  for (let p = 0; p < pages; p++) {
+    if (p === 0 || p === pages - 1 || Math.abs(p - page) <= 2) nums.push(go(p, p + 1, false, p === page));
+    else if (nums[nums.length - 1] !== "…") nums.push("…");
+  }
+  return `<div class="ticket-pager">
+    ${go(page - 1, "‹ 前へ", page === 0)}
+    ${nums.map(x => x === "…" ? `<span class="page-gap">…</span>` : x).join("")}
+    ${go(page + 1, "次へ ›", page === pages - 1)}
+    <span class="page-info">${(start + 1).toLocaleString()}〜${(start + count).toLocaleString()} / ${total.toLocaleString()}枚</span>
+  </div>`;
+}
+
+function setTicketPage(p) {
+  AppState.ticketPage = p;
+  renderCover();
+  document.querySelector(".tickets-section")?.scrollIntoView({ block: "start" });
 }
 
 function ticketLines() {
