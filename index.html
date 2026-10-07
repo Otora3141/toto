@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>toto予想アシスタント</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <span class="logo">⚽</span>
+  <div>
+    <h1>toto 予想アシスタント</h1>
+    <p>マルチ予想の組み合わせを削減</p>
+  </div>
+</header>
+
+<div class="container step-container">
+  <div class="step-nav">
+    <div class="step active" data-view="setup" onclick="switchView('setup')"><span class="step-num">1</span> 試合設定</div>
+    <span class="step-sep">›</span>
+    <div class="step" data-view="predict"><span class="step-num">2</span> 予想入力</div>
+    <span class="step-sep">›</span>
+    <div class="step" data-view="results"><span class="step-num">3</span> 買い目</div>
+  </div>
+</div>
+
+<!-- ===== 1. 試合設定 ===== -->
+<div id="view-setup" class="view active">
+  <div class="container">
+    <div class="card">
+      <h2>📅 開催回</h2>
+      <div class="round-row">
+        <select id="round-select" class="team-select" onchange="onRoundChange(this.value)">
+          <option>読み込み中…</option>
+        </select>
+        <button class="btn-secondary small" onclick="loadRounds()">再読込</button>
+      </div>
+      <p id="round-status" class="sub" style="margin-top:8px"></p>
+      <div id="kind-buttons" class="mode-toggle" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h2>📋 対象試合</h2>
+      <div class="setup-table-wrap">
+        <table class="setup-table">
+          <thead>
+            <tr><th>#</th><th>日時</th><th>ホーム</th><th></th><th>アウェイ</th><th>投票率 1 / 0 / 2</th></tr>
+          </thead>
+          <tbody id="setup-tbody"></tbody>
+        </table>
+      </div>
+      <datalist id="team-list"></datalist>
+      <button class="btn-primary" id="btn-to-predict" disabled onclick="switchView('predict')">予想入力へ →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 2. 予想入力 ===== -->
+<div id="view-predict" class="view">
+  <div class="container">
+    <div class="card">
+      <h2>🎯 各試合の予想（複数選択でマルチ）</h2>
+      <p id="combo-summary" class="combo-summary"></p>
+      <p class="sub" style="margin-top:8px">※ 勝率は、過去の toto 対象試合の結果と投票率をもとに当サイトが独自に計算した参考値です。投票率が出ていない場合は過去の結果のみで計算しています。<br>
+        ※ 直近5試合: <span class="form-mark form-W">○</span>勝ち <span class="form-mark form-D">△</span>引き分け <span class="form-mark form-L">×</span>負け（左が最新。印にカーソルを合わせると対戦相手とスコアを表示）</p>
+    </div>
+
+    <div id="predict-cards"></div>
+
+    <div class="nav-btns">
+      <button class="btn-secondary" onclick="switchView('setup')">← 試合設定</button>
+      <button class="btn-primary" id="btn-to-results" disabled onclick="switchView('results')" style="flex:1">買い目を作る →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3. 買い目 ===== -->
+<div id="view-results" class="view">
+  <div class="container">
+    <div class="card" id="level-card">
+      <h2>🛡 保証レベル</h2>
+      <div id="level-buttons" class="mode-toggle"></div>
+    </div>
+
+    <div class="card">
+      <h2>📈 サマリー</h2>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="s-label">本来の予想（全通り）</div><div class="s-value" id="sum-product">-</div><div class="s-sub" id="sum-product-yen"></div></div>
+        <div class="summary-card highlight"><div class="s-label">購入枚数</div><div class="s-value" id="sum-tickets">-</div><div class="s-sub" id="sum-tickets-yen"></div></div>
+      </div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="conf-table">
+          <thead><tr><th>#</th><th>試合</th><th>選んだ印</th></tr></thead>
+          <tbody id="marks-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="strat-section">
+      <div class="strat-header">
+        <span class="prize-icon">🎫</span>
+        <div><h3>購入する買い目</h3></div>
+      </div>
+      <div class="strat-body">
+        <div id="cover-status" class="strat-explanation">計算中…</div>
+        <div id="cover-content"></div>
+      </div>
+    </div>
+
+    <div class="nav-btns">
+      <button class="btn-secondary" onclick="switchView('predict')">← 予想を修正する</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/model.js"></script>
+<script src="js/covering.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
