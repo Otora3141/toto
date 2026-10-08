@@ -19,6 +19,7 @@ const AppState = {
     voteWeight: 0.5,     // 確率 = 過去データ 50% + 投票率 50% (投票率がある場合)
     h2hWeight: 0.2,      // 過去データ内の直接対決の重み
     level: 2,            // 保証する等級 (2=2等, 3=3等)。mini toto は常に全通り
+    perPage: 100,        // 買い目リストの1ページの表示件数
   },
   cover: null,
   view: "setup",
@@ -46,12 +47,17 @@ function loadPicks() {
   return null;
 }
 function saveSettings() {
-  try { localStorage.setItem("toto-level", String(AppState.settings.level)); } catch (e) { /* 無視 */ }
+  try {
+    localStorage.setItem("toto-level", String(AppState.settings.level));
+    localStorage.setItem("toto-per-page", String(AppState.settings.perPage));
+  } catch (e) { /* 無視 */ }
 }
 function loadSettings() {
   try {
     const lv = Number(localStorage.getItem("toto-level"));
     if ([2, 3].includes(lv)) AppState.settings.level = lv;
+    const pp = Number(localStorage.getItem("toto-per-page"));
+    if (PER_PAGE_OPTIONS.includes(pp)) AppState.settings.perPage = pp;
   } catch (e) { /* 無視 */ }
 }
 
@@ -436,7 +442,7 @@ function computeCoverInline({ allowed, probs, filters, radius, timeBudgetMs }) {
   }
 }
 
-const TICKETS_PER_PAGE = 100;
+const PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
 function renderCover() {
   const c = AppState.cover;
@@ -459,11 +465,12 @@ function renderCover() {
     ? `選んだ印の組み合わせを全通り購入します。結果がこの中に入れば1等です。`
     : `結果が選んだ印の範囲内（${c.universeSize.toLocaleString()} 通りのどれか）になれば、下の ${c.tickets.length.toLocaleString()} 枚のどれかが必ず ${n - (level - 1)} 試合以上的中します（${levelName}以上）。`;
 
-  const pages = Math.max(1, Math.ceil(c.tickets.length / TICKETS_PER_PAGE));
+  const perPage = AppState.settings.perPage;
+  const pages = Math.max(1, Math.ceil(c.tickets.length / perPage));
   const page = Math.min(AppState.ticketPage || 0, pages - 1);
-  const start = page * TICKETS_PER_PAGE;
-  const shown = c.tickets.slice(start, start + TICKETS_PER_PAGE);
-  const pager = pages > 1 ? ticketPagerHtml(page, pages, start, shown.length, c.tickets.length) : "";
+  const start = page * perPage;
+  const shown = c.tickets.slice(start, start + perPage);
+  const pager = c.tickets.length ? ticketPagerHtml(page, pages, start, shown.length, c.tickets.length) : "";
   const rows = shown.map((code, i) => `<div class="ticket-row">
       <span class="ticket-label">${(start + i + 1).toLocaleString()}枚目</span>
       <code class="ticket-code">${codeToMarks(code, n).split("").join("-")}</code></div>`).join("");
@@ -496,10 +503,18 @@ function ticketPagerHtml(page, pages, start, count, total) {
     if (p === 0 || p === pages - 1 || Math.abs(p - page) <= 2) nums.push(go(p, p + 1, false, p === page));
     else if (nums[nums.length - 1] !== "…") nums.push("…");
   }
-  return `<div class="ticket-pager">
+  const perPage = AppState.settings.perPage;
+  const sizeSel = `<label class="page-size">表示件数
+    <select onchange="setTicketsPerPage(Number(this.value))">
+      ${PER_PAGE_OPTIONS.map(v => `<option value="${v}" ${v === perPage ? "selected" : ""}>${v}件</option>`).join("")}
+    </select></label>`;
+  const nav = pages > 1 ? `
     ${go(page - 1, "‹ 前へ", page === 0)}
     ${nums.map(x => x === "…" ? `<span class="page-gap">…</span>` : x).join("")}
-    ${go(page + 1, "次へ ›", page === pages - 1)}
+    ${go(page + 1, "次へ ›", page === pages - 1)}` : "";
+  return `<div class="ticket-pager">
+    ${nav}
+    ${sizeSel}
     <span class="page-info">${(start + 1).toLocaleString()}〜${(start + count).toLocaleString()} / ${total.toLocaleString()}枚</span>
   </div>`;
 }
@@ -508,6 +523,15 @@ function setTicketPage(p) {
   AppState.ticketPage = p;
   renderCover();
   document.querySelector(".tickets-section")?.scrollIntoView({ block: "start" });
+}
+
+// 表示件数を変えても、今見ている先頭の買い目を含むページにとどまる
+function setTicketsPerPage(n) {
+  const first = (AppState.ticketPage || 0) * AppState.settings.perPage;
+  AppState.settings.perPage = n;
+  AppState.ticketPage = Math.floor(first / n);
+  saveSettings();
+  renderCover();
 }
 
 function ticketLines() {

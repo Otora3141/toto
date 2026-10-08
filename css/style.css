@@ -674,4 +674,6 @@ body {
 .page-btn:disabled { opacity: 0.4; cursor: default; }
 .page-gap { padding: 0 2px; color: var(--text-light); }
 .page-info { margin-left: 8px; font-size: 0.8rem; color: var(--text-light); }
+.page-size { margin-left: 8px; font-size: 0.8rem; color: var(--text-light); display: inline-flex; align-items: center; gap: 4px; }
+.page-size select { padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--surface2); }
 .combo-summary.warn { color: var(--red); font-weight: 600; }
